@@ -2,22 +2,48 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 
-export class NodeDependenciesProvider
+export default class RelatedFilesProvider
   implements vscode.TreeDataProvider<Dependency>
 {
-  constructor(private workspaceRoot?: string) {
-    vscode.window.showInformationMessage("Construct " + workspaceRoot);
+  private _onDidChangeTreeData: vscode.EventEmitter<
+    Dependency | undefined | null | void
+  > = new vscode.EventEmitter<Dependency | undefined | null | void>();
+  readonly onDidChangeTreeData: vscode.Event<
+    Dependency | undefined | null | void
+  > = this._onDidChangeTreeData.event;
+
+  refresh(): void {
+    this._onDidChangeTreeData.fire();
   }
 
   getTreeItem(element: Dependency): vscode.TreeItem {
     return element;
   }
 
-  getChildren(element?: Dependency): Thenable<Dependency[]> {
-    if (!this.workspaceRoot) {
-      // vscode.window.showInformationMessage("No dependency in empty workspace");
-      return Promise.resolve([]);
+  async getChildren(element?: Dependency): Promise<Dependency[]> {
+    const activeTextEditor = vscode.window.activeTextEditor;
+    if (!activeTextEditor) {
+      return [];
     }
+    // Perhaps we could also check here, but for now let's not
+    const workspace = vscode.workspace.getWorkspaceFolder(
+      activeTextEditor.document.uri
+    );
+    if (!workspace) {
+      return [];
+    }
+    try {
+      // TODO: Add caching or something similar
+
+      console.log(
+        `View for ${activeTextEditor.document.uri.toString()} in ${workspace.uri.toString()}`
+      );
+      return Promise.resolve([]);
+    } catch (error) {
+      // TODO: Do something useful with the error
+      return [];
+    }
+    /*
 
     if (element) {
       return Promise.resolve(
@@ -40,70 +66,7 @@ export class NodeDependenciesProvider
         return Promise.resolve([]);
       }
     }
-  }
-
-  /**
-   * Given the path to package.json, read all its dependencies and devDependencies.
-   */
-  private getDepsInPackageJson(packageJsonPath: string): Dependency[] {
-    if (this.pathExists(packageJsonPath)) {
-      const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
-
-      const toDep = (moduleName: string, version: string): Dependency => {
-        if (
-          this.workspaceRoot &&
-          this.pathExists(
-            path.join(this.workspaceRoot, "node_modules", moduleName)
-          )
-        ) {
-          return new Dependency(
-            moduleName,
-            version,
-            vscode.TreeItemCollapsibleState.Collapsed
-          );
-        } else {
-          return new Dependency(
-            moduleName,
-            version,
-            vscode.TreeItemCollapsibleState.None
-          );
-        }
-      };
-
-      const deps = packageJson.dependencies
-        ? Object.keys(packageJson.dependencies).map((dep) =>
-            toDep(dep, packageJson.dependencies[dep])
-          )
-        : [];
-      const devDeps = packageJson.devDependencies
-        ? Object.keys(packageJson.devDependencies).map((dep) =>
-            toDep(dep, packageJson.devDependencies[dep])
-          )
-        : [];
-      return deps.concat(devDeps);
-    } else {
-      return [];
-    }
-  }
-
-  private pathExists(p: string): boolean {
-    try {
-      fs.accessSync(p);
-    } catch (err) {
-      return false;
-    }
-    return true;
-  }
-
-  private _onDidChangeTreeData: vscode.EventEmitter<
-    Dependency | undefined | null | void
-  > = new vscode.EventEmitter<Dependency | undefined | null | void>();
-  readonly onDidChangeTreeData: vscode.Event<
-    Dependency | undefined | null | void
-  > = this._onDidChangeTreeData.event;
-
-  refresh(): void {
-    this._onDidChangeTreeData.fire();
+    */
   }
 }
 
@@ -115,9 +78,10 @@ class Dependency extends vscode.TreeItem {
   ) {
     super(label, collapsibleState);
     this.tooltip = `${this.label}-${this.version}`;
-    this.description = this.version;
+    this.description = false;
   }
 
+  // TODO: Can we reuse file icons or sth?
   iconPath = {
     light: path.join(
       __filename,
