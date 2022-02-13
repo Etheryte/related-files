@@ -1,12 +1,15 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import simpleGit, { SimpleGit } from "simple-git";
+
+import exec from "./exec";
+
+// import * as shell from "execa";
+// const execa = shell.execa;
 
 export default class RelatedFilesProvider
   implements vscode.TreeDataProvider<Dependency>
 {
-  private _git: SimpleGit | undefined;
   private _onDidChangeTreeData: vscode.EventEmitter<
     Dependency | undefined | null | void
   > = new vscode.EventEmitter<Dependency | undefined | null | void>();
@@ -16,13 +19,13 @@ export default class RelatedFilesProvider
 
   constructor() {
     try {
-      // TODO: This needs to change based on active file's workspace, see https://www.npmjs.com/package/simple-git#configuration
-      // If the user doesn't have git installed or whatnot, this might fail
-      this._git = simpleGit();
+      // If the user doesn't have git installed or whatnot, close the panel or whatnot
+      // if (!shell.which("git")) {
+      //   console.error("No git");
+      // }
     } catch (error) {
       // TODO: Use error
       // TODO: Can we hide the panel altogether?
-      // TODO: Also when there's no git repo at the location
     }
   }
 
@@ -35,10 +38,6 @@ export default class RelatedFilesProvider
   }
 
   async getChildren(item?: Dependency): Promise<Dependency[]> {
-    // If we can't get git information, there's nothing to do
-    if (!this._git) {
-      return [];
-    }
     const activeTextEditor = vscode.window.activeTextEditor;
     if (!activeTextEditor) {
       return [];
@@ -54,17 +53,33 @@ export default class RelatedFilesProvider
       // TODO: Add caching or something similar
 
       console.log(
-        `View for ${activeTextEditor.document.uri.toString()} in ${workspace.uri.toString()}`
+        `View for ${activeTextEditor.document.uri.fsPath} in ${workspace.uri.fsPath}`
       );
 
-      const uri = activeTextEditor.document.uri.toString();
-      console.log("checking log for " + uri);
-      const foo = await this._git.log({
-        file: uri,
-        format: "%H",
-        '--follow': null,
+      // Ensure we're in a Git repository, otherwise there's nothing to do, throws if not
+      await exec("git rev-parse --is-inside-work-tree", {
+        cwd: workspace.uri.fsPath,
       });
-      console.log(foo);
+
+      const commitsForFile = await exec(
+        // TODO: Is this safe to pass directly?
+        `git log --follow --format=%H -- ${activeTextEditor.document.uri.fsPath}`,
+        {
+          cwd: workspace.uri.fsPath,
+        }
+      );
+      // TODO: Validate output
+      // console.log(commitsForFile);
+
+      const fileNameLists = await Promise.all(
+        commitsForFile.split(/\r?\n/).map((hash) =>
+          exec(`git diff-tree --no-commit-id --name-only -r ${hash}`, {
+            cwd: workspace.uri.fsPath,
+          })
+        )
+      );
+
+      console.log(fileNameLists);
 
       return Promise.resolve([]);
     } catch (error) {
