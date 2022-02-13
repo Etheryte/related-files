@@ -12,6 +12,7 @@ export function activate(context: vscode.ExtensionContext) {
   // First load
   provider.refresh();
 
+  // TODO: Also when repository info changes or whatever?
   // Whenever the active editor changes, update or empty the view accordingly
   vscode.window.onDidChangeActiveTextEditor(
     () => {
