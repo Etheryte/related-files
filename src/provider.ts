@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import * as fs from "fs";
 import * as path from "path";
 
 import exec from "./exec";
@@ -7,13 +6,13 @@ import exec from "./exec";
 const MAX_COUNT = 25;
 
 export default class RelatedFilesProvider
-  implements vscode.TreeDataProvider<Dependency>
+  implements vscode.TreeDataProvider<RelatedFile>
 {
   private _onDidChangeTreeData: vscode.EventEmitter<
-    Dependency | undefined | null | void
-  > = new vscode.EventEmitter<Dependency | undefined | null | void>();
+    RelatedFile | undefined | null | void
+  > = new vscode.EventEmitter<RelatedFile | undefined | null | void>();
   readonly onDidChangeTreeData: vscode.Event<
-    Dependency | undefined | null | void
+    RelatedFile | undefined | null | void
   > = this._onDidChangeTreeData.event;
 
   constructor() {
@@ -32,12 +31,11 @@ export default class RelatedFilesProvider
     this._onDidChangeTreeData.fire();
   }
 
-  getTreeItem(item: Dependency): vscode.TreeItem {
+  getTreeItem(item: RelatedFile): vscode.TreeItem {
     return item;
   }
 
-  async getChildren(item?: Dependency): Promise<Dependency[]> {
-    console.log("item", item);
+  async getChildren(): Promise<RelatedFile[]> {
     const activeTextEditor = vscode.window.activeTextEditor;
     if (!activeTextEditor) {
       return [];
@@ -68,7 +66,7 @@ export default class RelatedFilesProvider
           cwd: workspace.uri.fsPath,
         }
       );
-      return countsAndNames.map(line => new Dependency(line));
+      return countsAndNames.map((line) => new RelatedFile(line));
 
       /*
       const commitsForFile = await exec(
@@ -98,15 +96,19 @@ export default class RelatedFilesProvider
   }
 }
 
-class Dependency extends vscode.TreeItem {
-  constructor(
-    public readonly fsPath: string
-  ) {
+class RelatedFile extends vscode.TreeItem {
+  constructor(public readonly fsPath: string) {
     super(fsPath, vscode.TreeItemCollapsibleState.None);
     const uri = vscode.Uri.file(fsPath);
-    this.label = path.basename(fsPath);
+    const label = path.basename(fsPath);
+    this.label = label;
     this.tooltip = fsPath;
     this.resourceUri = uri;
     this.description = false;
+    this.command = {
+      title: `Open ${label}`,
+      command: "vscode.open",
+      arguments: [uri],
+    };
   }
 }
