@@ -4,8 +4,7 @@ import * as path from "path";
 
 import exec from "./exec";
 
-// import * as shell from "execa";
-// const execa = shell.execa;
+const MAX_COUNT = 25;
 
 export default class RelatedFilesProvider
   implements vscode.TreeDataProvider<Dependency>
@@ -38,6 +37,7 @@ export default class RelatedFilesProvider
   }
 
   async getChildren(item?: Dependency): Promise<Dependency[]> {
+    console.log("item", item);
     const activeTextEditor = vscode.window.activeTextEditor;
     if (!activeTextEditor) {
       return [];
@@ -56,11 +56,21 @@ export default class RelatedFilesProvider
         `View for ${activeTextEditor.document.uri.fsPath} in ${workspace.uri.fsPath}`
       );
 
-      // Ensure we're in a Git repository, otherwise there's nothing to do, throws if not
+      // Check whether we're in a Git repository, throws if we're not
       await exec("git rev-parse --is-inside-work-tree", {
         cwd: workspace.uri.fsPath,
       });
 
+      const countsAndNames = await exec(
+        // TODO: Is this safe to pass directly?
+        `git log --follow --format=%H -- ${activeTextEditor.document.uri.fsPath} | xargs -n1 git diff-tree --no-commit-id --name-only -r | sort | uniq -c | sort -bgr | head -${MAX_COUNT}`,
+        {
+          cwd: workspace.uri.fsPath,
+        }
+      );
+      return countsAndNames.map(line => new Dependency(line));
+
+      /*
       const commitsForFile = await exec(
         // TODO: Is this safe to pass directly?
         `git log --follow --format=%H -- ${activeTextEditor.document.uri.fsPath}`,
@@ -69,19 +79,17 @@ export default class RelatedFilesProvider
         }
       );
       // TODO: Validate output
-      // console.log(commitsForFile);
-
       const fileNameLists = await Promise.all(
-        commitsForFile.split(/\r?\n/).map((hash) =>
+        commitsForFile.map((hash) =>
           exec(`git diff-tree --no-commit-id --name-only -r ${hash}`, {
             cwd: workspace.uri.fsPath,
           })
         )
       );
+      console.log(([] as any[]).concat.apply([], fileNameLists));
+      */
 
-      console.log(fileNameLists);
-
-      return Promise.resolve([]);
+      return [];
     } catch (error) {
       console.log(error);
       // TODO: Do something useful with the error
@@ -92,32 +100,13 @@ export default class RelatedFilesProvider
 
 class Dependency extends vscode.TreeItem {
   constructor(
-    public readonly label: string,
-    private version: string,
-    public readonly collapsibleState: vscode.TreeItemCollapsibleState
+    public readonly fsPath: string
   ) {
-    super(label, collapsibleState);
-    this.tooltip = `${this.label}-${this.version}`;
+    super(fsPath, vscode.TreeItemCollapsibleState.None);
+    const uri = vscode.Uri.file(fsPath);
+    this.label = path.basename(fsPath);
+    this.tooltip = fsPath;
+    this.resourceUri = uri;
     this.description = false;
   }
-
-  // TODO: Can we reuse file icons or sth?
-  iconPath = {
-    light: path.join(
-      __filename,
-      "..",
-      "..",
-      "resources",
-      "light",
-      "dependency.svg"
-    ),
-    dark: path.join(
-      __filename,
-      "..",
-      "..",
-      "resources",
-      "dark",
-      "dependency.svg"
-    ),
-  };
 }

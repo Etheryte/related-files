@@ -4,7 +4,7 @@ import * as shelljs from "shelljs";
 export default function exec(
   command: string,
   options: Omit<shelljs.ExecOptions, "async">
-): Promise<string> {
+): Promise<string[]> {
   return new Promise(function (resolve, reject) {
     const baseOptions: shelljs.ExecOptions = { async: true, silent: true };
     shelljs.exec(
@@ -12,7 +12,7 @@ export default function exec(
       Object.assign(baseOptions, options),
       function (code, stdout, stderr) {
         if (code != 0) return reject(new Error(stderr));
-        return resolve((stdout || "").trim());
+        return resolve((stdout || "").trim().split(/\r?\n/));
       }
     );
   });
