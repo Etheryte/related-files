@@ -11,7 +11,7 @@ export default function exec(
       command,
       Object.assign(baseOptions, options),
       function (code, stdout, stderr) {
-        if (code != 0) return reject(new Error(stderr));
+        if (code !== 0) return reject(new Error(stderr));
         return resolve((stdout || "").trim().split(/\r?\n/));
       }
     );

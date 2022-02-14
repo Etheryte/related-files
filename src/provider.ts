@@ -48,46 +48,68 @@ export default class RelatedFilesProvider
       return [];
     }
     try {
+      const activeFsPath = activeTextEditor.document.uri.fsPath;
+      const workspaceFsPath = workspace.uri.fsPath;
       // TODO: Add caching or something similar
 
       console.log(
-        `View for ${activeTextEditor.document.uri.fsPath} in ${workspace.uri.fsPath}`
+        `View for ${activeFsPath} in ${workspaceFsPath}`
       );
 
       // Check whether we're in a Git repository, throws if we're not
       await exec("git rev-parse --is-inside-work-tree", {
-        cwd: workspace.uri.fsPath,
+        cwd: workspaceFsPath,
       });
 
+      /*
       const countsAndNames = await exec(
         // TODO: Is this safe to pass directly?
-        `git log --follow --format=%H -- ${activeTextEditor.document.uri.fsPath} | xargs -n1 git diff-tree --no-commit-id --name-only -r | sort | uniq -c | sort -bgr | head -${MAX_COUNT}`,
+        `git log --follow --format=%H -- ${activeFsPath} | xargs -n1 git diff-tree --no-commit-id --name-only -r | sort | uniq -c | sort -bgr | head -${MAX_COUNT}`,
         {
-          cwd: workspace.uri.fsPath,
+          cwd: workspaceFsPath,
         }
       );
       return countsAndNames.map((line) => new RelatedFile(line));
+      */
 
-      /*
       const commitsForFile = await exec(
         // TODO: Is this safe to pass directly?
-        `git log --follow --format=%H -- ${activeTextEditor.document.uri.fsPath}`,
+        `git log --follow --format=%H -- ${activeFsPath}`,
         {
-          cwd: workspace.uri.fsPath,
+          cwd: workspaceFsPath,
         }
       );
       // TODO: Validate output
       const fileNameLists = await Promise.all(
         commitsForFile.map((hash) =>
           exec(`git diff-tree --no-commit-id --name-only -r ${hash}`, {
-            cwd: workspace.uri.fsPath,
+            cwd: workspaceFsPath,
           })
         )
       );
-      console.log(([] as any[]).concat.apply([], fileNameLists));
-      */
 
-      return [];
+      const fileNames = new Set<string>();
+      const fileNameCounts = new Map<string, number>();
+      for (var ii = 0; ii < fileNameLists.length; ii++) {
+        const fileNameList = fileNameLists[ii];
+        for (var jj = 0; jj < fileNameList.length; jj++) {
+          const fileName = fileNameList[jj];
+          const fullPath = path.resolve(workspaceFsPath, fileName);
+          fileNames.add(fullPath);
+          fileNameCounts.set(fullPath, (fileNameCounts.get(fullPath) ?? 0) + 1);
+        }
+      }
+
+      return (
+        Array.from(fileNames)
+          .sort(
+            (a, b) =>
+              (fileNameCounts.get(b) ?? 0) - (fileNameCounts.get(a) ?? 0)
+          )
+          .slice(0, MAX_COUNT)
+          // TODO: Filter out the file's own name
+          .map((fileName) => new RelatedFile(fileName))
+      );
     } catch (error) {
       console.log(error);
       // TODO: Do something useful with the error

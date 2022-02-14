@@ -25,9 +25,22 @@
     "commands": [
       {
         "command": "relatedFiles.refresh",
-        "title": "Refresh related files"
+        "title": "Refresh related files",
+        "icon": {
+          "light": "resources/light/refresh.svg",
+          "dark": "resources/dark/refresh.svg"
+        }
       }
-    ]
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "relatedFiles.refresh",
+          "when": "view == relatedFiles",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "yarn run compile",
