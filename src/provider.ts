@@ -4,6 +4,7 @@ import { promises as fs } from "fs";
 
 import exec from "./exec";
 
+// TODO: Make this configurable?
 const MAX_COUNT = 25;
 
 export default class RelatedFilesProvider
@@ -42,31 +43,30 @@ export default class RelatedFilesProvider
       return [];
     }
     try {
-      const workspaceFsPath = workspace.uri.fsPath;
-      const activeFsPath = path.resolve(
-        workspaceFsPath,
-        activeTextEditor.document.uri.fsPath
-      );
-      return this._getCachedRelatedFilesFor(workspaceFsPath, activeFsPath);
+      return this._getCachedRelatedFilesFor(workspace.uri, activeTextEditor.document.uri);
     } catch (error) {
       console.log(error);
       return [];
     }
   }
 
-  preloadRelatedFilesFor(workspaceFsPath: string, fileFsPath: string) {
-    this._getCachedRelatedFilesFor(workspaceFsPath, fileFsPath);
+  preloadRelatedFilesFor(workspaceUri: vscode.Uri, fileUri: vscode.Uri) {
+    this._getCachedRelatedFilesFor(workspaceUri, fileUri);
   }
 
   /** Either get related files from cache or cache them beforehand for future use */
   private async _getCachedRelatedFilesFor(
-    workspaceFsPath: string,
-    fileFsPath: string
+    workspaceUri: vscode.Uri,
+    fileUri: vscode.Uri
   ): Promise<RelatedFile[]> {
+    const workspaceFsPath = workspaceUri.fsPath;
+    const fileFsPath = path.resolve(workspaceFsPath, fileUri.fsPath);
     const cacheHit = this._cache.get(workspaceFsPath)?.get(fileFsPath);
     if (cacheHit) {
+      console.log("cache hit for", fileFsPath);
       return cacheHit;
     }
+    console.log("cache miss for", fileFsPath);
 
     const promise = this._getRelatedFilesFor(workspaceFsPath, fileFsPath);
 

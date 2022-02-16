@@ -21,6 +21,16 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions
   );
 
+  // For every open file, preload related files
+  for (const openDocument of vscode.workspace.textDocuments) {
+    console.log("found", openDocument.uri.fsPath);
+    const workspace = vscode.workspace.getWorkspaceFolder(openDocument.uri);
+    if (workspace) {
+      console.log("preload", openDocument.uri.fsPath);
+      provider.preloadRelatedFilesFor(workspace.uri, openDocument.uri);
+    }
+  }
+
   // TODO: On startup, preload all tabs in all workspaces
   // TODO: When a new workspace is opened, preload all tabs
   // TODO: When a workspace is closed, clear cache for it
