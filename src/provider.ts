@@ -63,20 +63,16 @@ export default class RelatedFilesProvider
     const fileFsPath = path.resolve(workspaceFsPath, fileUri.fsPath);
     const cacheHit = this._cache.get(workspaceFsPath)?.get(fileFsPath);
     if (cacheHit) {
-      console.log("cache hit for", fileFsPath);
       return cacheHit;
     }
-    console.log("cache miss for", fileFsPath);
 
     const promise = this._getRelatedFilesFor(workspaceFsPath, fileFsPath);
-
-    // Store in cache and return
-    let cacheLocation = this._cache.get(workspaceFsPath);
-    if (!cacheLocation) {
-      cacheLocation = new Map();
-      this._cache.set(workspaceFsPath, cacheLocation);
+    let workspaceCache = this._cache.get(workspaceFsPath);
+    if (!workspaceCache) {
+      workspaceCache = new Map();
+      this._cache.set(workspaceFsPath, workspaceCache);
     }
-    cacheLocation.set(fileFsPath, promise);
+    workspaceCache.set(fileFsPath, promise);
     return promise;
   }
 
