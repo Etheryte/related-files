@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import { promises as fs } from "fs";
 
 import exec from "./exec";
 
@@ -15,17 +16,11 @@ export default class RelatedFilesProvider
     RelatedFile | undefined | null | void
   > = this._onDidChangeTreeData.event;
 
-  constructor() {
-    try {
-      // If the user doesn't have git installed or whatnot, close the panel or whatnot
-      // if (!shell.which("git")) {
-      //   console.error("No git");
-      // }
-    } catch (error) {
-      // TODO: Use error
-      // TODO: Can we hide the panel altogether?
-    }
-  }
+  /** A map from a workspace fsPath to a map of a file's fsPath to related files */
+  private _cache = new Map<
+    string,
+    Map<string, Promise<RelatedFile[]> | undefined> | undefined
+  >();
 
   refresh(): void {
     this._onDidChangeTreeData.fire();
@@ -40,7 +35,6 @@ export default class RelatedFilesProvider
     if (!activeTextEditor) {
       return [];
     }
-    // Perhaps we could also check here, but for now let's not
     const workspace = vscode.workspace.getWorkspaceFolder(
       activeTextEditor.document.uri
     );
@@ -48,83 +42,113 @@ export default class RelatedFilesProvider
       return [];
     }
     try {
-      const activeFsPath = activeTextEditor.document.uri.fsPath;
       const workspaceFsPath = workspace.uri.fsPath;
-      // TODO: Add caching or something similar
-
-      console.log(
-        `View for ${activeFsPath} in ${workspaceFsPath}`
+      const activeFsPath = path.resolve(
+        workspaceFsPath,
+        activeTextEditor.document.uri.fsPath
       );
-
-      // Check whether we're in a Git repository, throws if we're not
-      await exec("git rev-parse --is-inside-work-tree", {
-        cwd: workspaceFsPath,
-      });
-
-      /*
-      const countsAndNames = await exec(
-        // TODO: Is this safe to pass directly?
-        `git log --follow --format=%H -- ${activeFsPath} | xargs -n1 git diff-tree --no-commit-id --name-only -r | sort | uniq -c | sort -bgr | head -${MAX_COUNT}`,
-        {
-          cwd: workspaceFsPath,
-        }
-      );
-      return countsAndNames.map((line) => new RelatedFile(line));
-      */
-
-      const commitsForFile = await exec(
-        // TODO: Is this safe to pass directly?
-        `git log --follow --format=%H -- ${activeFsPath}`,
-        {
-          cwd: workspaceFsPath,
-        }
-      );
-      // TODO: Validate output
-      const fileNameLists = await Promise.all(
-        commitsForFile.map((hash) =>
-          exec(`git diff-tree --no-commit-id --name-only -r ${hash}`, {
-            cwd: workspaceFsPath,
-          })
-        )
-      );
-
-      const fileNames = new Set<string>();
-      const fileNameCounts = new Map<string, number>();
-      for (var ii = 0; ii < fileNameLists.length; ii++) {
-        const fileNameList = fileNameLists[ii];
-        for (var jj = 0; jj < fileNameList.length; jj++) {
-          const fileName = fileNameList[jj];
-          const fullPath = path.resolve(workspaceFsPath, fileName);
-          fileNames.add(fullPath);
-          fileNameCounts.set(fullPath, (fileNameCounts.get(fullPath) ?? 0) + 1);
-        }
-      }
-
-      return (
-        Array.from(fileNames)
-          .sort(
-            (a, b) =>
-              (fileNameCounts.get(b) ?? 0) - (fileNameCounts.get(a) ?? 0)
-          )
-          .slice(0, MAX_COUNT)
-          // TODO: Filter out the file's own name
-          .map((fileName) => new RelatedFile(fileName))
-      );
+      return this._getCachedRelatedFilesFor(workspaceFsPath, activeFsPath);
     } catch (error) {
       console.log(error);
-      // TODO: Do something useful with the error
       return [];
     }
+  }
+
+  preloadRelatedFilesFor(workspaceFsPath: string, fileFsPath: string) {
+    this._getCachedRelatedFilesFor(workspaceFsPath, fileFsPath);
+  }
+
+  /** Either get related files from cache or cache them beforehand for future use */
+  private async _getCachedRelatedFilesFor(
+    workspaceFsPath: string,
+    fileFsPath: string
+  ): Promise<RelatedFile[]> {
+    const cacheHit = this._cache.get(workspaceFsPath)?.get(fileFsPath);
+    if (cacheHit) {
+      return cacheHit;
+    }
+
+    const promise = this._getRelatedFilesFor(workspaceFsPath, fileFsPath);
+
+    // Store in cache and return
+    let cacheLocation = this._cache.get(workspaceFsPath);
+    if (!cacheLocation) {
+      cacheLocation = new Map();
+      this._cache.set(workspaceFsPath, cacheLocation);
+    }
+    cacheLocation.set(fileFsPath, promise);
+    return promise;
+  }
+
+  private async _getRelatedFilesFor(
+    workspaceFsPath: string,
+    fileFsPath: string
+  ): Promise<RelatedFile[]> {
+    // Check whether we're in a Git repository, throws if we're not
+    await exec("git rev-parse --is-inside-work-tree", {
+      cwd: workspaceFsPath,
+    });
+
+    const commitHashesForFsPath = await exec(
+      // TODO: Is this safe to pass directly?
+      `git log --follow --format=%H -- ${fileFsPath}`,
+      {
+        cwd: workspaceFsPath,
+      }
+    );
+    // TODO: Validate output
+    const relativeFsPathLists = await Promise.all(
+      commitHashesForFsPath.map((hash) =>
+        exec(`git diff-tree --no-commit-id --name-only -r ${hash}`, {
+          cwd: workspaceFsPath,
+        })
+      )
+    );
+
+    const relativeFsPaths = new Set(relativeFsPathLists.flat());
+    const fullFsPaths = new Set<string>();
+    const fullFsPathCounts = new Map<string, number>();
+    for await (const fileName of Array.from(relativeFsPaths)) {
+      const fullFsPath = path.resolve(workspaceFsPath, fileName);
+
+      // If the path is not the open file itself
+      if (fullFsPath === fileFsPath) {
+        continue;
+      }
+
+      try {
+        // Only if the file exists
+        await fs.stat(fullFsPath);
+        fullFsPaths.add(fullFsPath);
+        fullFsPathCounts.set(
+          fullFsPath,
+          (fullFsPathCounts.get(fullFsPath) ?? 0) + 1
+        );
+      } catch (_) {
+        // Ignore the path since the file doesn't exists
+      }
+    }
+
+    return Array.from(fullFsPaths)
+      .sort(
+        (a, b) =>
+          (fullFsPathCounts.get(b) ?? 0) - (fullFsPathCounts.get(a) ?? 0)
+      )
+      .slice(0, MAX_COUNT)
+      .map((fileName) => new RelatedFile(fileName));
   }
 }
 
 class RelatedFile extends vscode.TreeItem {
-  constructor(public readonly fsPath: string) {
-    super(fsPath, vscode.TreeItemCollapsibleState.None);
-    const uri = vscode.Uri.file(fsPath);
-    const label = path.basename(fsPath);
+  constructor(public readonly fileFsPath: string) {
+    super(fileFsPath, vscode.TreeItemCollapsibleState.None);
+
+    const uri = vscode.Uri.file(fileFsPath);
+    const label = path.basename(fileFsPath);
     this.label = label;
-    this.tooltip = fsPath;
+    // The id is used for the sameness check in the UI, ensure the label isn't used
+    this.id = fileFsPath;
+    this.tooltip = fileFsPath;
     this.resourceUri = uri;
     this.description = false;
     this.command = {

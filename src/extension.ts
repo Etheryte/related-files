@@ -12,7 +12,6 @@ export function activate(context: vscode.ExtensionContext) {
   // First load
   provider.refresh();
 
-  // TODO: Also when repository info changes or whatever?
   // Whenever the active editor changes, update or empty the view accordingly
   vscode.window.onDidChangeActiveTextEditor(
     () => {
@@ -21,6 +20,10 @@ export function activate(context: vscode.ExtensionContext) {
     null,
     context.subscriptions
   );
+
+  // TODO: On startup, preload all tabs in all workspaces
+  // TODO: When a new workspace is opened, preload all tabs
+  // TODO: When a workspace is closed, clear cache for it
 }
 
 // this method is called when your extension is deactivated
