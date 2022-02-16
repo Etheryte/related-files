@@ -43,7 +43,10 @@ export default class RelatedFilesProvider
       return [];
     }
     try {
-      return this._getCachedRelatedFilesFor(workspace.uri, activeTextEditor.document.uri);
+      return this._getCachedRelatedFilesFor(
+        workspace.uri,
+        activeTextEditor.document.uri
+      );
     } catch (error) {
       console.log(error);
       return [];
@@ -101,10 +104,9 @@ export default class RelatedFilesProvider
       )
     );
 
-    const relativeFsPaths = new Set(relativeFsPathLists.flat());
     const fullFsPaths = new Set<string>();
     const fullFsPathCounts = new Map<string, number>();
-    for await (const fileName of Array.from(relativeFsPaths)) {
+    for await (const fileName of relativeFsPathLists.flat()) {
       const fullFsPath = path.resolve(workspaceFsPath, fileName);
 
       // If the path is not the open file itself
@@ -113,9 +115,13 @@ export default class RelatedFilesProvider
       }
 
       try {
+        // TODO: Only check once for each file
         // Only if the file exists
         await fs.stat(fullFsPath);
         fullFsPaths.add(fullFsPath);
+        if (fullFsPath.includes("yarnrc")) {
+          console.log("yarn");
+        }
         fullFsPathCounts.set(
           fullFsPath,
           (fullFsPathCounts.get(fullFsPath) ?? 0) + 1
@@ -125,30 +131,42 @@ export default class RelatedFilesProvider
       }
     }
 
+    console.log(fullFsPathCounts);
+
     return Array.from(fullFsPaths)
       .sort(
         (a, b) =>
-          (fullFsPathCounts.get(b) ?? 0) - (fullFsPathCounts.get(a) ?? 0)
+          // Sort primarily by count
+          (fullFsPathCounts.get(b) ?? 0) - (fullFsPathCounts.get(a) ?? 0) ||
+          // And then alphabetically
+          b.localeCompare(a)
       )
       .slice(0, MAX_COUNT)
-      .map((fileName) => new RelatedFile(fileName));
+      .map(
+        (fullFsPath) =>
+          new RelatedFile(fullFsPath, fullFsPathCounts.get(fullFsPath))
+      );
   }
 }
 
+// TODO: If the label matches the open file label (multiple files with same name), show a longer path
 class RelatedFile extends vscode.TreeItem {
-  constructor(public readonly fileFsPath: string) {
+  constructor(
+    public readonly fileFsPath: string,
+    count?: number,
+    longLabel: boolean = false
+  ) {
     super(fileFsPath, vscode.TreeItemCollapsibleState.None);
 
     const uri = vscode.Uri.file(fileFsPath);
-    const label = path.basename(fileFsPath);
-    this.label = label;
+    this.label = longLabel ? fileFsPath : path.basename(fileFsPath);
     // The id is used for the sameness check in the UI, ensure the label isn't used
     this.id = fileFsPath;
     this.tooltip = fileFsPath;
     this.resourceUri = uri;
-    this.description = false;
+    this.description = count ? `${count} ${count > 1 ? "commits" : "commit"}` : undefined;
     this.command = {
-      title: `Open ${label}`,
+      title: `Open ${path.basename(fileFsPath)}`,
       command: "vscode.open",
       arguments: [uri],
     };
