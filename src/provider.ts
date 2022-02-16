@@ -129,8 +129,6 @@ export default class RelatedFilesProvider
       }
     }
 
-    console.log(fullFsPathCounts);
-
     return Array.from(fullFsPaths)
       .sort(
         (a, b) =>
