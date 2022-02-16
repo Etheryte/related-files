@@ -115,13 +115,11 @@ export default class RelatedFilesProvider
       }
 
       try {
-        // TODO: Only check once for each file
-        // Only if the file exists
+        // Check if file exists
+        // TODO: Check only once
         await fs.stat(fullFsPath);
         fullFsPaths.add(fullFsPath);
-        if (fullFsPath.includes("yarnrc")) {
-          console.log("yarn");
-        }
+
         fullFsPathCounts.set(
           fullFsPath,
           (fullFsPathCounts.get(fullFsPath) ?? 0) + 1
@@ -164,7 +162,9 @@ class RelatedFile extends vscode.TreeItem {
     this.id = fileFsPath;
     this.tooltip = fileFsPath;
     this.resourceUri = uri;
-    this.description = count ? `${count} ${count > 1 ? "commits" : "commit"}` : undefined;
+    this.description = count
+      ? `${count} ${count > 1 ? "commits" : "commit"}`
+      : undefined;
     this.command = {
       title: `Open ${path.basename(fileFsPath)}`,
       command: "vscode.open",
