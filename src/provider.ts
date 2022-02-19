@@ -115,7 +115,6 @@ export default class RelatedFilesProvider
       await Promise.all(
         Array.from(fullFsPaths).map(async (fullFsPath) => {
           try {
-            // Check if the file currently exists
             await fs.stat(fullFsPath);
             return fullFsPath;
           } catch {
