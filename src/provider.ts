@@ -4,11 +4,10 @@ import { promises as fs } from "fs";
 
 import RelatedFile from "./relatedFile";
 import Cache from "./cache";
-import execGit from "./exec";
+import getRelatedFilesFor from "./git";
 
 // TODO: Make this configurable?
 const MAX_COUNT = 25;
-const HASH_REGEX = /^[a-f0-9]{40}$/;
 
 export default class RelatedFilesProvider
   implements vscode.TreeDataProvider<RelatedFile>
@@ -83,51 +82,21 @@ export default class RelatedFilesProvider
     const workspaceFsPath = workspaceUri.fsPath;
     const fileFsPath = path.resolve(workspaceFsPath, fileUri.fsPath);
 
-    // Check whether we're in a Git repository, throws if we're not
-    await execGit("rev-parse --is-inside-work-tree", {
-      cwd: workspaceFsPath,
-    });
-
-    const commitHashesForFsPath = await execGit(
-      // TODO: Is this safe to pass directly?
-      `log --follow --format=%H -- ${fileFsPath}`,
-      {
-        cwd: workspaceFsPath,
-      }
-    );
-    if (!commitHashesForFsPath.length) {
-      return [];
-    }
-
-    const validHashes = commitHashesForFsPath.filter((hash) =>
-      HASH_REGEX.test(hash)
-    );
-    if (validHashes.length !== commitHashesForFsPath.length) {
-      throw new RangeError(`Got invalid hashes for ${fileFsPath}`);
-    }
-
-    // TODO: Validate output
-    const relativeFsPathLists = await Promise.all(
-      validHashes.map((hash) =>
-        execGit(`diff-tree --no-commit-id --name-only -r ${hash}`, {
-          cwd: workspaceFsPath,
-        })
-      )
-    );
-
+    const relativeFsPaths = await getRelatedFilesFor(workspaceUri, fileUri);
+    // Figure out how many times each related file was committed along with this one
     const fullFsPaths = new Set<string>();
     const fullFsPathCounts = new Map<string, number>();
-    for await (const fileName of relativeFsPathLists.flat()) {
+    for await (const fileName of relativeFsPaths.flat()) {
       const fullFsPath = path.resolve(workspaceFsPath, fileName);
 
-      // If the path is not the open file itself
+      // Exclude the open file itself
       if (fullFsPath === fileFsPath) {
         continue;
       }
 
       try {
-        // Check if file exists
-        // TODO: Check only once
+        // Check if the file currently exists
+        // TODO: Check only once per path
         await fs.stat(fullFsPath);
         fullFsPaths.add(fullFsPath);
 
@@ -143,7 +112,7 @@ export default class RelatedFilesProvider
     return Array.from(fullFsPaths)
       .sort(
         (a, b) =>
-          // Sort primarily by count
+          // Sort primarily by commit count
           (fullFsPathCounts.get(b) ?? 0) - (fullFsPathCounts.get(a) ?? 0) ||
           // And then alphabetically
           b.localeCompare(a)
