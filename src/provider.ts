@@ -91,7 +91,8 @@ export default class RelatedFilesProvider
     // Figure out how many times each related file was committed along with this one
     const fullFsPaths = new Set<string>();
     const fullFsPathCounts = new Map<string, number>();
-    for await (const fileName of relativeFsPaths) {
+    for (let ii = 0; ii < relativeFsPaths.length; ii++) {
+      const fileName = relativeFsPaths[ii];
       // This shouldn't happen, but just to be sure
       if (!fileName) {
         throw new TypeError("Received no file name");
@@ -102,23 +103,30 @@ export default class RelatedFilesProvider
       if (fullFsPath === fileFsPath) {
         continue;
       }
-
-      try {
-        // Check if the file currently exists
-        // TODO: Check only once per path
-        await fs.stat(fullFsPath);
-        fullFsPaths.add(fullFsPath);
-
-        fullFsPathCounts.set(
-          fullFsPath,
-          (fullFsPathCounts.get(fullFsPath) ?? 0) + 1
-        );
-      } catch (_) {
-        // Ignore the path since the file doesn't exists
-      }
+      fullFsPaths.add(fullFsPath);
+      fullFsPathCounts.set(
+        fullFsPath,
+        (fullFsPathCounts.get(fullFsPath) ?? 0) + 1
+      );
     }
 
-    return Array.from(fullFsPaths)
+    // Check whether the files still exist
+    const validFsPaths = (
+      await Promise.all(
+        Array.from(fullFsPaths).map(async (fullFsPath) => {
+          try {
+            // Check if the file currently exists
+            await fs.stat(fullFsPath);
+            return fullFsPath;
+          } catch {
+            // Ignore the path since the file doesn't exists
+            return undefined;
+          }
+        })
+      )
+    ).filter((result) => typeof result !== "undefined") as string[];
+
+    return validFsPaths
       .sort(
         (a, b) =>
           // Sort primarily by commit count
