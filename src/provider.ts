@@ -21,10 +21,11 @@ export default class RelatedFilesProvider
 
   private _cache = new Cache<Promise<RelatedFile[]>>();
 
-  refresh(): void {
+  updateView(): void {
     // Update the tree view
     this._onDidChangeTreeData.fire();
 
+    // TODO: Do this only after `getChildren()` and automatically update the current file's cache if we have it
     // Clean up old cache entries
     setTimeout(() => {
       this._cache.clearOldEntries();
@@ -59,6 +60,10 @@ export default class RelatedFilesProvider
 
   preloadCacheFor(workspaceUri: vscode.Uri, fileUri: vscode.Uri): void {
     this._getCachedRelatedFilesFor(workspaceUri, fileUri);
+  }
+
+  clearCache() {
+    this._cache.clear();
   }
 
   /** Either get related files from cache or cache them beforehand for future use */

@@ -53,6 +53,11 @@ export default class Cache<T> {
     }
   }
 
+  /** Clear all cache entries */
+  clear(): void {
+    this._state.clear();
+  }
+
   async clearOldEntries() {
     // Throttle clears to once a minute at most
     const now = new Date().valueOf();

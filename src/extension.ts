@@ -6,17 +6,19 @@ export function activate(context: vscode.ExtensionContext) {
   // See https://code.visualstudio.com/api/extension-guides/tree-view
   const provider = new Provider();
   vscode.window.registerTreeDataProvider("relatedFiles", provider);
+
   // This is currently only for debugging
-  vscode.commands.registerCommand("relatedFiles.refresh", () =>
-    provider.refresh()
-  );
+  vscode.commands.registerCommand("relatedFiles.refresh", () => {
+    provider.clearCache();
+    provider.updateView();
+  });
 
   // First load
-  provider.refresh();
+  provider.updateView();
   // Whenever the active editor changes, update or empty the view accordingly
   vscode.window.onDidChangeActiveTextEditor(
     () => {
-      provider.refresh();
+      provider.updateView();
     },
     null,
     context.subscriptions
