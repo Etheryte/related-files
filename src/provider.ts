@@ -2,10 +2,13 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { promises as fs } from "fs";
 
+import RelatedFile from "./relatedFile";
+import Cache from "./cache";
 import exec from "./exec";
 
 // TODO: Make this configurable?
 const MAX_COUNT = 25;
+const HASH_REGEX = /^[a-f0-9]{40}$/;
 
 export default class RelatedFilesProvider
   implements vscode.TreeDataProvider<RelatedFile>
@@ -17,14 +20,16 @@ export default class RelatedFilesProvider
     RelatedFile | undefined | null | void
   > = this._onDidChangeTreeData.event;
 
-  /** A map from a workspace fsPath to a map of a file's fsPath to related files */
-  private _cache = new Map<
-    string,
-    Map<string, Promise<RelatedFile[]> | undefined> | undefined
-  >();
+  private _cache = new Cache();
 
   refresh(): void {
+    // Update the tree view
     this._onDidChangeTreeData.fire();
+
+    // Clean up old cache entries
+    setTimeout(() => {
+      this._cache.clearOldEntries();
+    }, 0);
   }
 
   getTreeItem(item: RelatedFile): vscode.TreeItem {
@@ -53,7 +58,7 @@ export default class RelatedFilesProvider
     }
   }
 
-  preloadRelatedFilesFor(workspaceUri: vscode.Uri, fileUri: vscode.Uri) {
+  preloadCacheFor(workspaceUri: vscode.Uri, fileUri: vscode.Uri): void {
     this._getCachedRelatedFilesFor(workspaceUri, fileUri);
   }
 
@@ -62,27 +67,22 @@ export default class RelatedFilesProvider
     workspaceUri: vscode.Uri,
     fileUri: vscode.Uri
   ): Promise<RelatedFile[]> {
-    const workspaceFsPath = workspaceUri.fsPath;
-    const fileFsPath = path.resolve(workspaceFsPath, fileUri.fsPath);
-    const cacheHit = this._cache.get(workspaceFsPath)?.get(fileFsPath);
+    const cacheHit = this._cache.get(workspaceUri, fileUri);
     if (cacheHit) {
       return cacheHit;
     }
-
-    const promise = this._getRelatedFilesFor(workspaceFsPath, fileFsPath);
-    let workspaceCache = this._cache.get(workspaceFsPath);
-    if (!workspaceCache) {
-      workspaceCache = new Map();
-      this._cache.set(workspaceFsPath, workspaceCache);
-    }
-    workspaceCache.set(fileFsPath, promise);
+    const promise = this._getRelatedFilesFor(workspaceUri, fileUri);
+    this._cache.set(workspaceUri, fileUri, promise);
     return promise;
   }
 
   private async _getRelatedFilesFor(
-    workspaceFsPath: string,
-    fileFsPath: string
+    workspaceUri: vscode.Uri,
+    fileUri: vscode.Uri
   ): Promise<RelatedFile[]> {
+    const workspaceFsPath = workspaceUri.fsPath;
+    const fileFsPath = path.resolve(workspaceFsPath, fileUri.fsPath);
+
     // Check whether we're in a Git repository, throws if we're not
     await exec("git rev-parse --is-inside-work-tree", {
       cwd: workspaceFsPath,
@@ -95,9 +95,20 @@ export default class RelatedFilesProvider
         cwd: workspaceFsPath,
       }
     );
+    if (!commitHashesForFsPath.length) {
+      return [];
+    }
+
+    const validHashes = commitHashesForFsPath.filter((hash) =>
+      HASH_REGEX.test(hash)
+    );
+    if (validHashes.length !== commitHashesForFsPath.length) {
+      throw new RangeError(`Got invalid hashes for ${fileFsPath}`);
+    }
+
     // TODO: Validate output
     const relativeFsPathLists = await Promise.all(
-      commitHashesForFsPath.map((hash) =>
+      validHashes.map((hash) =>
         exec(`git diff-tree --no-commit-id --name-only -r ${hash}`, {
           cwd: workspaceFsPath,
         })
@@ -142,31 +153,5 @@ export default class RelatedFilesProvider
         (fullFsPath) =>
           new RelatedFile(fullFsPath, fullFsPathCounts.get(fullFsPath))
       );
-  }
-}
-
-// TODO: If the label matches the open file label (multiple files with same name), show a longer path
-class RelatedFile extends vscode.TreeItem {
-  constructor(
-    public readonly fileFsPath: string,
-    count?: number,
-    longLabel: boolean = false
-  ) {
-    super(fileFsPath, vscode.TreeItemCollapsibleState.None);
-
-    const uri = vscode.Uri.file(fileFsPath);
-    this.label = longLabel ? fileFsPath : path.basename(fileFsPath);
-    // The id is used for the sameness check in the UI, ensure the label isn't used
-    this.id = fileFsPath;
-    this.tooltip = fileFsPath;
-    this.resourceUri = uri;
-    this.description = count
-      ? `${count} ${count > 1 ? "commits" : "commit"}`
-      : undefined;
-    this.command = {
-      title: `Open ${path.basename(fileFsPath)}`,
-      command: "vscode.open",
-      arguments: [uri],
-    };
   }
 }

@@ -6,12 +6,13 @@ export function activate(context: vscode.ExtensionContext) {
   // See https://code.visualstudio.com/api/extension-guides/tree-view
   const provider = new Provider();
   vscode.window.registerTreeDataProvider("relatedFiles", provider);
+  // This is currently only for debugging
   vscode.commands.registerCommand("relatedFiles.refresh", () =>
     provider.refresh()
   );
+
   // First load
   provider.refresh();
-
   // Whenever the active editor changes, update or empty the view accordingly
   vscode.window.onDidChangeActiveTextEditor(
     () => {
@@ -21,20 +22,17 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions
   );
 
-  // For every open file, preload related files
+  // TODO: This seems to yield only the active tab, can we somehow retrieve all tabs?
+  // For open files, preload related files
   for (const openDocument of vscode.workspace.textDocuments) {
-    console.log("found", openDocument.uri.fsPath);
     const workspace = vscode.workspace.getWorkspaceFolder(openDocument.uri);
     if (workspace) {
-      console.log("preload", openDocument.uri.fsPath);
-      provider.preloadRelatedFilesFor(workspace.uri, openDocument.uri);
+      provider.preloadCacheFor(workspace.uri, openDocument.uri);
     }
   }
-
-  // TODO: On startup, preload all tabs in all workspaces
-  // TODO: When a new workspace is opened, preload all tabs
-  // TODO: When a workspace is closed, clear cache for it
 }
 
 // this method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() {
+  // TODO: Do we need to clean up anything manually?
+}
