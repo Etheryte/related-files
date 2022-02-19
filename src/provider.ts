@@ -53,13 +53,20 @@ export default class RelatedFilesProvider
         activeTextEditor.document.uri
       );
     } catch (error) {
-      console.log(error);
+      console.error(error);
       return [];
     }
   }
 
-  preloadCacheFor(workspaceUri: vscode.Uri, fileUri: vscode.Uri): void {
-    this._getCachedRelatedFilesFor(workspaceUri, fileUri);
+  async preloadCacheFor(
+    workspaceUri: vscode.Uri,
+    fileUri: vscode.Uri
+  ): Promise<void> {
+    try {
+      await this._getCachedRelatedFilesFor(workspaceUri, fileUri);
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   clearCache() {
@@ -84,10 +91,11 @@ export default class RelatedFilesProvider
     workspaceUri: vscode.Uri,
     fileUri: vscode.Uri
   ): Promise<RelatedFile[]> {
+    const relativeFsPaths = await getRelatedFilesFor(workspaceUri, fileUri);
+
     const workspaceFsPath = workspaceUri.fsPath;
     const fileFsPath = path.resolve(workspaceFsPath, fileUri.fsPath);
 
-    const relativeFsPaths = await getRelatedFilesFor(workspaceUri, fileUri);
     // Figure out how many times each related file was committed along with this one
     const fullFsPaths = new Set<string>();
     const fullFsPathCounts = new Map<string, number>();
