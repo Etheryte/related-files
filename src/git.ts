@@ -40,7 +40,8 @@ export default async function getRelatedFilesFor(
   return filteredExec(
     // See https://stackoverflow.com/a/42528210/1470607
     // This returns non-zero if we're not in a repository so we don't need to check for that separately
-    `${git} log --follow --format=%H -- ${fileFsPath} | xargs ${git} show --format="" --name-only`,
+    // NB! The `git log --follow` flag makes git log incredibly slow compared to non-follow, so we're using a simple `git rev-list` instead
+    `${git} rev-list HEAD -- ${fileFsPath} | xargs ${git} show --format="" --name-only`,
     {
       cwd: workspaceUri.fsPath,
     }
