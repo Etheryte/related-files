@@ -4,7 +4,7 @@ import { promises as fs } from "fs";
 
 import RelatedFile from "./relatedFile";
 import Cache from "./cache";
-import exec from "./exec";
+import execGit from "./exec";
 
 // TODO: Make this configurable?
 const MAX_COUNT = 25;
@@ -84,13 +84,13 @@ export default class RelatedFilesProvider
     const fileFsPath = path.resolve(workspaceFsPath, fileUri.fsPath);
 
     // Check whether we're in a Git repository, throws if we're not
-    await exec("git rev-parse --is-inside-work-tree", {
+    await execGit("rev-parse --is-inside-work-tree", {
       cwd: workspaceFsPath,
     });
 
-    const commitHashesForFsPath = await exec(
+    const commitHashesForFsPath = await execGit(
       // TODO: Is this safe to pass directly?
-      `git log --follow --format=%H -- ${fileFsPath}`,
+      `log --follow --format=%H -- ${fileFsPath}`,
       {
         cwd: workspaceFsPath,
       }
@@ -109,7 +109,7 @@ export default class RelatedFilesProvider
     // TODO: Validate output
     const relativeFsPathLists = await Promise.all(
       validHashes.map((hash) =>
-        exec(`git diff-tree --no-commit-id --name-only -r ${hash}`, {
+        execGit(`diff-tree --no-commit-id --name-only -r ${hash}`, {
           cwd: workspaceFsPath,
         })
       )
