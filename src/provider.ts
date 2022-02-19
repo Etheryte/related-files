@@ -86,7 +86,11 @@ export default class RelatedFilesProvider
     // Figure out how many times each related file was committed along with this one
     const fullFsPaths = new Set<string>();
     const fullFsPathCounts = new Map<string, number>();
-    for await (const fileName of relativeFsPaths.flat()) {
+    for await (const fileName of relativeFsPaths) {
+      // This shouldn't happen, but just to be sure
+      if (!fileName) {
+        throw new TypeError("Received no file name");
+      }
       const fullFsPath = path.resolve(workspaceFsPath, fileName);
 
       // Exclude the open file itself

@@ -12,7 +12,7 @@ try {
 } catch (_) {}
 
 // See https://gist.github.com/davidrleonard/2962a3c40497d93c422d1269bcd38c8f
-function exec(
+function filteredExec(
   command: string,
   options: Omit<shelljs.ExecOptions, "async">
 ): Promise<string[]> {
@@ -23,7 +23,9 @@ function exec(
       Object.assign(baseOptions, options),
       function (code, stdout, stderr) {
         if (code !== 0) return reject(new Error(stderr));
-        return resolve((stdout || "").trim().split(/\r?\n/));
+        const result = (stdout || "").trim().split(/\r?\n/);
+        const noEmptyLines = result.filter(Boolean);
+        return resolve(noEmptyLines);
       }
     );
   });
@@ -35,7 +37,7 @@ export default async function getRelatedFilesFor(
   fileUri: vscode.Uri
 ) {
   const fileFsPath = path.resolve(workspaceUri.fsPath, fileUri.fsPath);
-  return exec(
+  return filteredExec(
     // See https://stackoverflow.com/a/42528210/1470607
     // This returns non-zero if we're not in a repository so we don't need to check for that separately
     `${git} log --follow --format=%H -- ${fileFsPath} | xargs ${git} show --format="" --name-only`,
