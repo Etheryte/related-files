@@ -1,40 +1,31 @@
 import * as vscode from "vscode";
 import * as path from "path";
 
-import RelatedFile from "./relatedFile";
-
 const MAX_CACHE_AGE = 5; // minutes
 const ONE_MINUTE = 1000 * 60; // ms
 
-type CacheItem = {
-  entry: Promise<RelatedFile[]>;
+type CacheItem<T> = {
+  entry: T;
   entryTime: ReturnType<Date["valueOf"]>;
 };
 
-export default class Cache {
-  /** A map from a workspace fsPath to a map of a file's fsPath to related files */
+export default class Cache<T> {
+  /** A map from a workspace fsPath to a map of a file's fsPath to a cache entry */
   private _state = new Map<
     string,
-    Map<string, CacheItem | undefined> | undefined
+    Map<string, CacheItem<T> | undefined> | undefined
   >();
   private _lastClear: ReturnType<Date["valueOf"]> | undefined;
 
   /** Get a cache item for a file in a workspace */
-  get(
-    workspaceUri: vscode.Uri,
-    fileUri: vscode.Uri
-  ): Promise<RelatedFile[]> | undefined {
+  get(workspaceUri: vscode.Uri, fileUri: vscode.Uri): T | undefined {
     const workspaceFsPath = workspaceUri.fsPath;
     const fileFsPath = path.resolve(workspaceFsPath, fileUri.fsPath);
     return this._state.get(workspaceFsPath)?.get(fileFsPath)?.entry;
   }
 
   /** Set a cache item for a file in a workspace */
-  set(
-    workspaceUri: vscode.Uri,
-    fileUri: vscode.Uri,
-    entry: Promise<RelatedFile[]>
-  ): void {
+  set(workspaceUri: vscode.Uri, fileUri: vscode.Uri, entry: T): void {
     const workspaceFsPath = workspaceUri.fsPath;
     const fileFsPath = path.resolve(workspaceFsPath, fileUri.fsPath);
     let workspaceCache = this._state.get(workspaceFsPath);

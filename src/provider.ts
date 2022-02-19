@@ -20,7 +20,7 @@ export default class RelatedFilesProvider
     RelatedFile | undefined | null | void
   > = this._onDidChangeTreeData.event;
 
-  private _cache = new Cache();
+  private _cache = new Cache<Promise<RelatedFile[]>>();
 
   refresh(): void {
     // Update the tree view
