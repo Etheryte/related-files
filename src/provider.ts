@@ -1,13 +1,16 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { promises as fs } from "fs";
+import * as micromatch from "micromatch";
 
 import RelatedFile from "./relatedFile";
 import Cache from "./cache";
 import getRelatedFilesFor from "./git";
 
-// TODO: Make this configurable?
+// TODO: Make this configurable
 const MAX_COUNT = 25;
+// TODO: Make this configurable
+const IGNORE_GLOBS: string[] = ["**/yarn.lock", "**/package-lock.json"];
 
 export default class RelatedFilesProvider
   implements vscode.TreeDataProvider<RelatedFile>
@@ -118,15 +121,19 @@ export default class RelatedFilesProvider
       );
     }
 
-    // Check whether the files still exist
     const validFsPaths = (
       await Promise.all(
         Array.from(fullFsPaths).map(async (fullFsPath) => {
           try {
+            // Check whether the files still exist
             await fs.stat(fullFsPath);
+            // Check whether the path matches any ignore globs
+            if (micromatch.isMatch(fullFsPath, IGNORE_GLOBS)) {
+              return undefined;
+            }
             return fullFsPath;
           } catch {
-            // Ignore the path since the file doesn't exists
+            // Ignore the path
             return undefined;
           }
         })

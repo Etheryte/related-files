@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 
+// TODO: What's a good value here?
 const MAX_CACHE_AGE = 5; // minutes
 const ONE_MINUTE = 1000 * 60; // ms
 

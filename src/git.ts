@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as shelljs from "shelljs";
+import { FSWatcher, promises as fs, unwatchFile, watch, watchFile } from "fs";
 
 let git = "git";
 try {
@@ -29,6 +30,27 @@ function filteredExec(
       }
     );
   });
+}
+
+// TODO: Is there a better way to implement this?
+export async function onBranchChange(
+  workspaceUri: vscode.Uri,
+  callback: () => void
+) {
+  const head = path.resolve(workspaceUri.fsPath, "./.git/HEAD");
+  let watcher: FSWatcher | undefined;
+  try {
+    // Ensure the file exists
+    await fs.stat(head);
+    // TODO: Investigate why `fs.watch()` doesn't seem to figure out HEAD changes
+    watchFile(head, callback);
+  } catch (error) {
+    console.error(error);
+  }
+
+  return function destroyListener() {
+    unwatchFile(head, callback);
+  };
 }
 
 /** Get relative paths of files that have been committed together with a given file, include duplicates */
