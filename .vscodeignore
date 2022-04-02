@@ -1,2 +1,15 @@
 .DS_Store
-src/test/
+.vscode
+assets
+node_modules
+out
+src
+.gitignore
+.prettierrc
+.vscodeignore
+CHANGELOG.md
+package.json
+README.md
+tsconfig.json
+webpack.config.js
+yarn.lock
