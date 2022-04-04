@@ -1,7 +1,7 @@
 {
   "name": "related-files",
   "displayName": "Related Files",
-  "description": "",
+  "description": "Show files related to the currently open file based on its Git history.",
   "version": "0.0.1",
   "publisher": "Etheryte",
   "repository": {
@@ -15,6 +15,10 @@
   "categories": [
     "Other"
   ],
+  "keywords": [
+    "git"
+  ],
+  "// icon": "assets/icon.png",
   "activationEvents": [
     "onStartupFinished"
   ],
@@ -46,11 +50,26 @@
           "group": "navigation"
         }
       ]
+    },
+    "configuration": {
+      "title": "Related Files",
+      "properties": {
+        "relatedFiles.ignoreGlobs": {
+          "type": "string",
+          "default": "**/package-lock.json, **/yarn.lock",
+          "description": "Comma-separated list of path globs to ignore."
+        },
+        "relatedFiles.maxCount": {
+          "type": "number",
+          "default": 25,
+          "description": "The maximum number of related files to list."
+        }
+      }
     }
   },
   "scripts": {
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "start": "yarn webpack-dev",
     "pretest": "yarn run compile && yarn run lint",
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js",

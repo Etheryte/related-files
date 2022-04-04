@@ -8,8 +8,10 @@ src
 .prettierrc
 .vscodeignore
 CHANGELOG.md
-package.json
+# We need package to recheck defaults
+# package.json
 README.md
+*.vsix
 tsconfig.json
 webpack.config.js
 yarn.lock

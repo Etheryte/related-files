@@ -6,11 +6,7 @@ import * as micromatch from "micromatch";
 import RelatedFile from "./relatedFile";
 import Cache from "./cache";
 import getRelatedFilesFor from "./git";
-
-// TODO: Make this configurable
-const MAX_COUNT = 25;
-// TODO: Make this configurable
-const IGNORE_GLOBS: string[] = ["**/yarn.lock", "**/package-lock.json"];
+import configuration from "./configuration";
 
 export default class RelatedFilesProvider
   implements vscode.TreeDataProvider<RelatedFile>
@@ -24,7 +20,11 @@ export default class RelatedFilesProvider
 
   private _cache = new Cache<Promise<RelatedFile[]>>();
 
-  updateView(): void {
+  updateView(force?: true): void {
+    if (force) {
+      this._cache.clear();
+    }
+
     // Update the tree view
     this._onDidChangeTreeData.fire();
 
@@ -121,6 +121,8 @@ export default class RelatedFilesProvider
       );
     }
 
+    const ignoreGlobs = configuration.getIgnoreGlobs();
+    const maxCount = configuration.getMaxCount();
     const validFsPaths = (
       await Promise.all(
         Array.from(fullFsPaths).map(async (fullFsPath) => {
@@ -128,7 +130,7 @@ export default class RelatedFilesProvider
             // Check whether the files still exist
             await fs.stat(fullFsPath);
             // Check whether the path matches any ignore globs
-            if (micromatch.isMatch(fullFsPath, IGNORE_GLOBS)) {
+            if (micromatch.isMatch(fullFsPath, ignoreGlobs)) {
               return undefined;
             }
             return fullFsPath;
@@ -148,7 +150,7 @@ export default class RelatedFilesProvider
           // And then alphabetically
           b.localeCompare(a)
       )
-      .slice(0, MAX_COUNT)
+      .slice(0, maxCount)
       .map(
         (fullFsPath) =>
           new RelatedFile(fullFsPath, fullFsPathCounts.get(fullFsPath))

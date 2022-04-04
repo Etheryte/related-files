@@ -48,6 +48,14 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions
   );
 
+  // Whenever settings change, clear the cache and update the view
+  vscode.workspace.onDidChangeConfiguration((changeEvent) => {
+    if (!changeEvent.affectsConfiguration("relatedFiles")) {
+      return;
+    }
+    provider?.updateView(true);
+  });
+
   // TODO: This seems to yield only the active tab, can we somehow retrieve all tabs?
   // For open files, preload related files
   for (const openDocument of vscode.workspace.textDocuments) {
