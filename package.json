@@ -2,7 +2,7 @@
   "name": "related-files",
   "displayName": "Related Files",
   "description": "Show files related to the currently open file based on its Git history.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "Etheryte",
   "repository": {
     "type": "git",

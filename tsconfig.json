@@ -3,7 +3,7 @@
     "module": "es6",
     "target": "es2018",
     "lib": ["es2020"],
-    "outDir": "out",
+    "outDir": "dist",
     "sourceMap": true,
     "strict": true,
     "rootDir": "src"
