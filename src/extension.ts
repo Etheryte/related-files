@@ -32,7 +32,7 @@ export function activate(context: vscode.ExtensionContext) {
   //   }
   // }
 
-  // TODO: Do we need to do this for every workspace, watch for those changes etc?
+  // TODO: Do we need to do this for every workspace, watch for workspace list changes etc?
   // onBranchChange(() => {
   //   console.log("branch changed");
   // });
@@ -53,7 +53,8 @@ export function activate(context: vscode.ExtensionContext) {
     if (!changeEvent.affectsConfiguration("relatedFiles")) {
       return;
     }
-    provider?.updateView(true);
+    provider?.clearCache();
+    provider?.updateView();
   });
 
   // TODO: This seems to yield only the active tab, can we somehow retrieve all tabs?
@@ -69,5 +70,5 @@ export function activate(context: vscode.ExtensionContext) {
 // this method is called when your extension is deactivated
 export function deactivate() {
   // TODO: Do we need to clean up anything manually?
-  // provider?.destroy();
+  provider = undefined;
 }

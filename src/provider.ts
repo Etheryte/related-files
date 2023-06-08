@@ -20,11 +20,7 @@ export default class RelatedFilesProvider
 
   private _cache = new Cache<Promise<RelatedFile[]>>();
 
-  updateView(force?: true): void {
-    if (force) {
-      this._cache.clear();
-    }
-
+  updateView(): void {
     // Update the tree view
     this._onDidChangeTreeData.fire();
 
